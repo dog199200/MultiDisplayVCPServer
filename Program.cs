@@ -700,5 +700,21 @@ namespace MultiDisplayVCPServer
                 Log($"Error modifying registry for startup: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Allows external classes (like MainForm) to report a change in the server's busy state.
+        /// </summary>
+        /// <param name="state">The new state (0=Stopped, 1=Running, 2=Busy/Restarting).</param>
+        public static void SetServerState(int state)
+        {
+            // Only update if the state is actually changing
+            if (Settings.Default.ServerState != state)
+            {
+                Settings.Default.ServerState = state;
+                Settings.Default.Save();
+                Log($"Server state manually set to {state}.");
+                ServerStateChanged?.Invoke(null, state);
+            }
+        }
     }
 }

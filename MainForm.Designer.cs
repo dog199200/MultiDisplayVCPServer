@@ -39,6 +39,7 @@ namespace MultiDisplayVCPServer
             restartToolStripMenuItem = new ToolStripMenuItem();
             runOnStartupToolStripMenuItem = new ToolStripMenuItem();
             minimizeToSystemTrayToolStripMenuItem = new ToolStripMenuItem();
+            checkUpdatesToolStripMenuItem = new ToolStripMenuItem();
             exitToolStripMenuItem = new ToolStripMenuItem();
             portTextBox = new TextBox();
             portLabel = new Label();
@@ -61,9 +62,9 @@ namespace MultiDisplayVCPServer
             // 
             // contextMenuStrip1
             // 
-            contextMenuStrip1.Items.AddRange(new ToolStripItem[] { configureToolStripMenuItem, restartToolStripMenuItem, runOnStartupToolStripMenuItem, minimizeToSystemTrayToolStripMenuItem, exitToolStripMenuItem });
+            contextMenuStrip1.Items.AddRange(new ToolStripItem[] { configureToolStripMenuItem, restartToolStripMenuItem, runOnStartupToolStripMenuItem, minimizeToSystemTrayToolStripMenuItem, checkUpdatesToolStripMenuItem, exitToolStripMenuItem });
             contextMenuStrip1.Name = "contextMenuStrip1";
-            contextMenuStrip1.Size = new Size(204, 114);
+            contextMenuStrip1.Size = new Size(204, 136);
             // 
             // configureToolStripMenuItem
             // 
@@ -94,6 +95,13 @@ namespace MultiDisplayVCPServer
             minimizeToSystemTrayToolStripMenuItem.Size = new Size(203, 22);
             minimizeToSystemTrayToolStripMenuItem.Text = "Minimize to System Tray";
             minimizeToSystemTrayToolStripMenuItem.Click += minimizeToSystemTrayToolStripMenuItem_Click;
+            // 
+            // checkUpdatesToolStripMenuItem
+            // 
+            checkUpdatesToolStripMenuItem.Name = "checkUpdatesToolStripMenuItem";
+            checkUpdatesToolStripMenuItem.Size = new Size(203, 22);
+            checkUpdatesToolStripMenuItem.Text = "Check for Updates";
+            checkUpdatesToolStripMenuItem.Click += checkUpdatesToolStripMenuItem_Click;
             // 
             // exitToolStripMenuItem
             // 
@@ -203,6 +211,7 @@ namespace MultiDisplayVCPServer
         #endregion
 
         // Renamed and corrected declarations
+        private ToolStripMenuItem checkUpdatesToolStripMenuItem;
         private System.Windows.Forms.NotifyIcon notifyIcon1;
         private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
         private System.Windows.Forms.ToolStripMenuItem configureToolStripMenuItem;

@@ -1,10 +1,16 @@
 using MultiDisplayVCPServer.Properties;
-using System;
-using System.Collections.Generic;
-using System.Net;
 using System.Net.Sockets;
-using System.Windows.Forms;
-using System.Threading.Tasks; // Added for Task
+using System.Net;
+using System.Text.Json;
+using System.Reflection;
+using System.Diagnostics;
+using System.Text.Json.Serialization;
+using System;                 // Added
+using System.Collections.Generic; // Added
+using System.Windows.Forms;     // Added
+using System.Threading.Tasks;   // Added
+using System.Linq;            // Added
+using System.Net.Http;        // Added
 
 namespace MultiDisplayVCPServer
 {
@@ -14,6 +20,9 @@ namespace MultiDisplayVCPServer
     /// </summary>
     public partial class MainForm : Form
     {
+        private static readonly HttpClient httpClient = new HttpClient();
+        private const string GitHubApiUrl = "https://api.github.com/repos/dog199200/MultiDisplayVCPServer/releases/latest";
+
         /// <summary>
         /// A set of common network ports that the server is forbidden from using
         /// to prevent conflicts with standard services (e.g., HTTP, FTP, RDP).
@@ -44,7 +53,6 @@ namespace MultiDisplayVCPServer
         {
             try
             {
-                // Upgrades application settings from a previous version, if available.
                 Settings.Default.Upgrade();
             }
             catch (Exception ex)
@@ -421,6 +429,8 @@ namespace MultiDisplayVCPServer
             }
         }
 
+        #region Tray Menu Handlers
+
         /// <summary>
         /// Handles the "Configure" click from the tray icon menu.
         /// Shows the main window.
@@ -460,6 +470,11 @@ namespace MultiDisplayVCPServer
             minimizeToTrayCheckBox.Checked = newState;
         }
 
+        private async void checkUpdatesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            await CheckForUpdatesAsync();
+        }
+
         /// <summary>
         /// Handles the "Exit" click from the tray icon menu.
         /// Forces the "MinimizeToTray" setting off and exits the application.
@@ -482,6 +497,10 @@ namespace MultiDisplayVCPServer
             configureToolStripMenuItem_Click(sender, e);
         }
 
+        #endregion
+
+        #region Form Control Handlers
+
         /// <summary>
         /// Toggles the password visibility in the text box.
         /// </summary>
@@ -497,6 +516,105 @@ namespace MultiDisplayVCPServer
                 passwordTextBox.PasswordChar = '*'; // Hide text
                 showPasswordCheckBox.ImageIndex = 0; // "show" icon
             }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Checks GitHub for a new version of the application.
+        /// </summary>
+        private async Task CheckForUpdatesAsync()
+        {
+            // 1. Get current version
+            Version currentVersion = Assembly.GetExecutingAssembly().GetName().Version;
+
+            // --- THIS IS THE FIX ---
+            Program.SetServerState(2); // Set state to "Busy"
+                                       // --- END FIX ---
+
+            MessageBox.Show("Checking for updates...", "Update Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            try
+            {
+                // 2. Make web request (GitHub API requires a User-Agent)
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "MultiDisplayVCPServer-Updater");
+                string jsonResponse = await httpClient.GetStringAsync(GitHubApiUrl);
+
+                // 3. Parse the JSON
+                var release = JsonSerializer.Deserialize<GitHubRelease>(jsonResponse);
+                if (release == null || string.IsNullOrEmpty(release.TagName))
+                {
+                    throw new Exception("Could not parse release information.");
+                }
+
+                // 4. Compare versions
+                // GitHub tags are often "v1.1.0", so we strip the "v"
+                Version latestVersion = new Version(release.TagName.TrimStart('v'));
+
+                if (latestVersion > currentVersion)
+                {
+                    // 5. New version found! Ask user to download.
+                    var result = MessageBox.Show($"A new version ({release.TagName}) is available. You are currently on {currentVersion}.\n\nWould you like to open the download page?",
+                                    "Update Available",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Information);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        // Find the installer asset (e.g., .msi or .exe)
+                        string downloadUrl = release.HtmlUrl; // Default to the release page
+                        var installerAsset = release.Assets?.FirstOrDefault(a => a.DownloadUrl.EndsWith(".msi") || a.DownloadUrl.EndsWith(".exe"));
+                        if (installerAsset != null)
+                        {
+                            downloadUrl = installerAsset.DownloadUrl;
+                        }
+
+                        // Open the URL in the default browser
+                        Process.Start(new ProcessStartInfo(downloadUrl) { UseShellExecute = true });
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("You are already running the latest version.", "Up to Date", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to check for updates. Please check your internet connection or visit the GitHub page manually.\n\nError: {ex.Message}",
+                                "Update Check Failed",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // --- THIS IS THE FIX ---
+                Program.SetServerState(1); // Set state back to "Running"
+                // --- END FIX ---
+            }
+        }
+
+        /// <summary>
+        /// DTO for deserializing the GitHub /releases/latest API response.
+        /// </summary>
+        private class GitHubRelease
+        {
+            [JsonPropertyName("tag_name")]
+            public string TagName { get; set; }
+
+            [JsonPropertyName("html_url")]
+            public string HtmlUrl { get; set; }
+
+            [JsonPropertyName("assets")]
+            public List<GitHubAsset> Assets { get; set; }
+        }
+
+        /// <summary>
+        /// DTO for deserializing a release asset from the GitHub API.
+        /// </summary>
+        private class GitHubAsset
+        {
+            [JsonPropertyName("browser_download_url")]
+            public string DownloadUrl { get; set; }
         }
     }
 }
