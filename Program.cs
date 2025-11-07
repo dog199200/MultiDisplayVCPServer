@@ -10,16 +10,50 @@ using System.Text.RegularExpressions;
 
 namespace MultiDisplayVCPServer
 {
+    /// <summary>
+    /// Main application class. Handles server lifecycle, client connections, and command execution.
+    /// </summary>
     public static class Program
     {
+        /// <summary>
+        /// A unique GUID to ensure only one instance of the application can run.
+        /// </summary>
         private const string AppGuid = "MultiDisplayVCPServer.0D77BA1D-F890-48F0-975F-5E8A91F2681E";
+
+        /// <summary>
+        /// Mutex to enforce the single-instance-only rule.
+        /// </summary>
         private static Mutex appMutex = null;
+
+        /// <summary>
+        /// The main TCP listener for incoming client connections.
+        /// </summary>
         private static TcpListener listener;
+
+        /// <summary>
+        /// CancellationTokenSource to gracefully shut down the server.
+        /// </summary>
         private static CancellationTokenSource cts;
+
+        /// <summary>
+        /// The background task that runs the server's listener loop.
+        /// </summary>
         private static Task listenerTask;
+
+        /// <summary>
+        /// Event that fires when the server's state (Stopped, Running, Restarting) changes.
+        /// </summary>
         public static event EventHandler<int> ServerStateChanged;
+
+        /// <summary>
+        /// Event that fires to send a log message to the UI.
+        /// </summary>
         public static event EventHandler<string> LogMessageReceived;
 
+        /// <summary>
+        /// Logs a message to the console and to the main UI form if it's open.
+        /// </summary>
+        /// <param name="message">The message to log.</param>
         private static void Log(string message)
         {
             string logEntry = $"[{DateTime.Now:HH:mm:ss}] {message}";
@@ -30,12 +64,16 @@ namespace MultiDisplayVCPServer
             }
         }
 
+        /// <summary>
+        /// The main entry point for the application.
+        /// </summary>
         [STAThread]
         public static void Main(string[] args)
         {
             bool createdNew = false;
             try
             {
+                // Ensure only one instance of the app is running
                 appMutex = new Mutex(true, $"Global\\{AppGuid}", out createdNew);
             }
             catch (Exception)
@@ -55,6 +93,9 @@ namespace MultiDisplayVCPServer
             appMutex.ReleaseMutex();
         }
 
+        /// <summary>
+        /// Starts the TCP listener background task.
+        /// </summary>
         public static void StartServerLoop()
         {
             if (listenerTask != null && !listenerTask.IsCompleted)
@@ -66,14 +107,22 @@ namespace MultiDisplayVCPServer
             listenerTask = Task.Run(() => ListenerLoopAsync(cts.Token));
             Log("Server startup initiated...");
         }
+
+        /// <summary>
+        /// Signals the TCP listener to stop and cancels the background task.
+        /// </summary>
         public static void ShutdownServer()
         {
             cts?.Cancel();
             listener?.Stop();
         }
+
+        /// <summary>
+        /// Shuts down the server, waits, and then starts it again.
+        /// </summary>
         public static void RestartServer()
         {
-            Settings.Default.ServerState = 2;
+            Settings.Default.ServerState = 2; // Set state to "Restarting"
             Settings.Default.Save();
             ServerStateChanged?.Invoke(null, 2);
             ShutdownServer();
@@ -81,6 +130,11 @@ namespace MultiDisplayVCPServer
             StartServerLoop();
             Log("Server restart sequence completed.");
         }
+
+        /// <summary>
+        /// The main server loop that runs on a background thread.
+        /// </summary>
+        /// <param name="token">The cancellation token to signal shutdown.</param>
         private static async Task ListenerLoopAsync(CancellationToken token)
         {
             bool serverStartedSuccessfully = false;
@@ -90,7 +144,7 @@ namespace MultiDisplayVCPServer
                 listener = new TcpListener(IPAddress.Any, port);
                 listener.Start();
                 serverStartedSuccessfully = true;
-                Settings.Default.ServerState = 1;
+                Settings.Default.ServerState = 1; // "Running"
                 Settings.Default.Save();
                 Log($"Server started on port {port}. Waiting for connections...");
                 ServerStateChanged?.Invoke(null, 1);
@@ -102,6 +156,7 @@ namespace MultiDisplayVCPServer
                     {
                         Log($"Client connected: {client.Client.RemoteEndPoint}");
                     }
+                    // Handle each client on its own task
                     Task.Run(() => HandleClientAsync(client, token), token);
                 }
             }
@@ -124,7 +179,7 @@ namespace MultiDisplayVCPServer
             finally
             {
                 listener?.Stop();
-                Settings.Default.ServerState = 0;
+                Settings.Default.ServerState = 0; // "Stopped"
                 Settings.Default.Save();
                 if (!token.IsCancellationRequested)
                 {
@@ -132,6 +187,12 @@ namespace MultiDisplayVCPServer
                 }
             }
         }
+
+        /// <summary>
+        /// Handles a single connected client.
+        /// </summary>
+        /// <param name="client">The connected TcpClient.</param>
+        /// <param name="token">The cancellation token.</param>
         private static async Task HandleClientAsync(TcpClient client, CancellationToken token)
         {
             string remoteEndPoint = client.Client.RemoteEndPoint?.ToString() ?? "Unknown Client";
@@ -146,6 +207,7 @@ namespace MultiDisplayVCPServer
                     Log($"Received request from {remoteEndPoint}: '{receivedData}'");
                     if (string.IsNullOrEmpty(receivedData)) return;
 
+                    // Protocol: timestamp|hash_base64|command
                     string[] parts = receivedData.Split(new[] { '|' }, 3);
                     string responseMessage;
                     bool isJson = false;
@@ -195,22 +257,33 @@ namespace MultiDisplayVCPServer
             }
         }
 
+        /// <summary>
+        /// Validates an incoming request's HMAC hash and timestamp.
+        /// </summary>
+        /// <param name="timestampStr">The client-provided Unix timestamp string.</param>
+        /// <param name="hashBase64">The client-provided HMAC-SHA256 hash.</param>
+        /// <param name="command">The command being executed.</param>
+        /// <param name="password">The shared secret (password) used to generate the hash.</param>
+        /// <returns>True if the hash and timestamp are valid, otherwise false.</returns>
         private static bool ValidateHash(string timestampStr, string hashBase64, string command, string password)
         {
             try
             {
+                // 1. Check timestamp
                 if (!long.TryParse(timestampStr, NumberStyles.None, CultureInfo.InvariantCulture, out long timestamp))
                     return false;
 
                 var requestTime = DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime;
                 var now = DateTime.UtcNow;
 
+                // Allow a 30-second window
                 if (requestTime < now.AddSeconds(-30) || requestTime > now.AddSeconds(30))
                 {
                     Log("Hash validation failed: Stale timestamp.");
                     return false;
                 }
 
+                // 2. Check hash
                 using (var hmac = new HMACSHA256(Encoding.ASCII.GetBytes(password)))
                 {
                     string messageToHash = command + timestampStr;
@@ -233,6 +306,12 @@ namespace MultiDisplayVCPServer
             }
         }
 
+        /// <summary>
+        /// Parses and executes a validated command from a client.
+        /// </summary>
+        /// <param name="command">The command to execute (e.g., "GET_CAPS" or "SET:ID:CODE:VALUE").</param>
+        /// <param name="isJson">Output parameter; set to true if the response is JSON.</param>
+        /// <returns>A string response for the client.</returns>
         private static string ExecuteDdcCiCommand(string command, out bool isJson)
         {
             isJson = false;
@@ -250,7 +329,7 @@ namespace MultiDisplayVCPServer
                     uint.TryParse(parts[2], out uint vcpCode) &&
                     uint.TryParse(parts[3], out uint vcpValue))
                 {
-                    string targetPnP_ID = parts[1];
+                    string targetPnP_ID = parts[1]; // This is the stable Model ID
                     IntPtr targetHandle = FindMonitorHandle(targetPnP_ID);
 
                     if (targetHandle != (IntPtr)(-1))
@@ -285,11 +364,17 @@ namespace MultiDisplayVCPServer
 
         #region Monitor_DDC/CI_Helpers
 
+        /// <summary>
+        /// Finds the DDC/CI handle (hMonitor) for a monitor based on its stable PnP Model ID.
+        /// </summary>
+        /// <param name="targetPnP_ID">The stable Model ID (e.g., "ACR0D1D").</param>
+        /// <returns>A handle to the physical monitor, or -1 if not found.</returns>
         static IntPtr FindMonitorHandle(string targetPnP_ID)
         {
             Log($"Finding handle for PnP_ID: {targetPnP_ID}");
             if (string.IsNullOrEmpty(targetPnP_ID)) return (IntPtr)(-1);
 
+            // 1. Get the WMI map of PnP_ID -> DDC/CI Description
             var pnpMap = MonitorWmiHelper.GetPnPMonitorMap();
             if (!pnpMap.TryGetValue(targetPnP_ID, out string targetDescription))
             {
@@ -298,9 +383,11 @@ namespace MultiDisplayVCPServer
             }
             Log($"Target DDC/CI Description is: {targetDescription}");
 
+            // 2. Enumerate all monitors
             var monitors = MonitorController.EnumeratePhysicalMonitors(new Dictionary<string, string>());
             IntPtr foundHandle = (IntPtr)(-1);
 
+            // 3. Find the monitor with the matching DDC/CI Description
             foreach (var monitor in monitors)
             {
                 if (monitor.Description.Equals(targetDescription, StringComparison.OrdinalIgnoreCase))
@@ -311,6 +398,7 @@ namespace MultiDisplayVCPServer
                 }
             }
 
+            // 4. Clean up other handles
             foreach (var monitor in monitors)
             {
                 if (monitor.Handle != foundHandle)
@@ -322,19 +410,35 @@ namespace MultiDisplayVCPServer
             return foundHandle;
         }
 
+        /// <summary>
+        /// Gathers capabilities from all DDC/CI-compliant monitors and returns them as a JSON string.
+        /// </summary>
+        /// <returns>A JSON string representing the ServerStatus object.</returns>
         static string GetMonitorCapabilitiesJson()
         {
+            // 1. Get the map of DDC/CI Description -> PnP Model ID
             var pnpMap = MonitorWmiHelper.GetMonitorPnPMap();
             Log($"Found {pnpMap.Count} monitors in WMI.");
 
             List<MonitorInfo> monitorList = new List<MonitorInfo>();
 
+            // 2. Enumerate all physical monitors
             var physicalMonitors = MonitorController.EnumeratePhysicalMonitors(pnpMap);
             Log($"Found {physicalMonitors.Count} DDC/CI monitors.");
 
             foreach (var pMon in physicalMonitors)
             {
                 IntPtr hMonitor = pMon.Handle;
+
+                // 3. Check for stable PnP_ID (if it's missing, we can't use this monitor)
+                if (string.IsNullOrEmpty(pMon.PnP_ID))
+                {
+                    Log($"Skipping monitor {pMon.Description}: Could not find matching PnP_ID in WMI.");
+                    MonitorController.DestroyPhysicalMonitor(hMonitor);
+                    continue;
+                }
+
+                // 4. Get capabilities string
                 uint length = 0;
                 if (!MonitorController.GetCapabilitiesStringLength(hMonitor, ref length))
                 {
@@ -351,19 +455,13 @@ namespace MultiDisplayVCPServer
                     continue;
                 }
 
-                if (string.IsNullOrEmpty(pMon.PnP_ID))
-                {
-                    Log($"Skipping monitor {pMon.Description}: Could not find matching PnP_ID in WMI.");
-                    MonitorController.DestroyPhysicalMonitor(hMonitor);
-                    continue;
-                }
-
+                // 5. Discover all VCP features
                 List<VcpFeature> features = DiscoverAllVcpFeatures(hMonitor, sb.ToString());
 
                 monitorList.Add(new MonitorInfo
                 {
-                    DeviceID = pMon.PnP_ID,
-                    Description = pMon.Description,
+                    DeviceID = pMon.PnP_ID, // The stable Model ID
+                    Description = pMon.Description, // The DDC/CI Name
                     Capabilities = features
                 });
 
@@ -380,21 +478,37 @@ namespace MultiDisplayVCPServer
             return JsonSerializer.Serialize(status, options);
         }
 
+        /// <summary>
+        /// Helper to parse a hex string to a uint.
+        /// </summary>
         static bool TryParseVcpHex(string hex, out uint result)
         {
             return uint.TryParse(hex, System.Globalization.NumberStyles.HexNumber,
             System.Globalization.CultureInfo.InvariantCulture, out result);
         }
+
+        /// <summary>
+        /// Iterates through all possible VCP codes (0-255) to discover a monitor's features.
+        /// </summary>
+        /// <param name="hMonitor">The monitor's handle.</param>
+        /// <param name="capString">The monitor's capabilities string (for parsing non-continuous values).</param>
+        /// <returns>A list of VcpFeature objects.</returns>
         static List<VcpFeature> DiscoverAllVcpFeatures(IntPtr hMonitor, string capString)
         {
             List<VcpFeature> features = new List<VcpFeature>();
+
+            // List of VCP codes to ignore (reserved, table, or buggy)
             var exclusionList = new HashSet<byte>
             {
                 0x04, 0x05, 0x08, 0xAC, 0xAE, 0xB6, 0xC0, 0xC8, 0xC9, 0xDF, 0x02, 0x52, 0x82,
                 0xB2, 0xC6, 0xCA, 0xCC, 0xDC,
             };
-            for (int i = 224; i <= 255; i++) { exclusionList.Add((byte)i); }
+            for (int i = 224; i <= 255; i++) { exclusionList.Add((byte)i); } // 0xE0-0xFF
+
+            // Known non-continuous VCP codes
             var nonContinuousList = new HashSet<byte> { 0x14, 0x60, 0x8D, 0xD6, };
+
+            // Parse non-continuous value maps from the capability string (e.g., "60(01 02 0F)")
             Dictionary<byte, string> nonContinuousMap = new Dictionary<byte, string>();
             Match vcpMatch = Regex.Match(capString, @"vcp\((.*?)\)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             if (vcpMatch.Success)
@@ -414,6 +528,7 @@ namespace MultiDisplayVCPServer
                 }
             }
 
+            // Brute-force check all 256 VCP codes
             for (int vcpCode = 0; vcpCode <= 255; vcpCode++)
             {
                 uint currentValue = 0;
@@ -431,7 +546,7 @@ namespace MultiDisplayVCPServer
                     {
                         Code = (byte)vcpCode,
                         Name = GetVcpFeatureName((byte)vcpCode),
-                        ReadWrite = true,
+                        ReadWrite = true, // We assume Read/Write if GetVCPFeature succeeded
                         CurrentValue = currentValue,
                         MaximumValue = maximumValue,
                     };
@@ -447,7 +562,7 @@ namespace MultiDisplayVCPServer
                                 if (TryParseVcpHex(valHex, out uint val))
                                 {
                                     if (feature.NonContinuousValues == null) feature.NonContinuousValues = new Dictionary<uint, string>();
-                                    feature.NonContinuousValues[val] = val.ToString();
+                                    feature.NonContinuousValues[val] = val.ToString(); // TODO: Add friendly names if available
                                 }
                             }
                         }
@@ -461,6 +576,10 @@ namespace MultiDisplayVCPServer
             }
             return features;
         }
+
+        /// <summary>
+        /// Provides a friendly name for a known VCP code.
+        /// </summary>
         static string GetVcpFeatureName(byte code)
         {
             return code switch
@@ -510,6 +629,9 @@ namespace MultiDisplayVCPServer
         }
         #endregion
 
+        /// <summary>
+        /// Sends a response back to the client over the network stream.
+        /// </summary>
         private static async Task SendResponseAsync(NetworkStream stream, string message, bool isJson, CancellationToken token)
         {
             byte[] response = Encoding.ASCII.GetBytes(message);
@@ -518,6 +640,9 @@ namespace MultiDisplayVCPServer
             Log($"Sent response: {logMessage}");
         }
 
+        /// <summary>
+        /// Saves the current application settings to disk.
+        /// </summary>
         public static void SaveSettings()
         {
             try
@@ -531,6 +656,10 @@ namespace MultiDisplayVCPServer
             }
         }
 
+        /// <summary>
+        /// Enables or disables the application's automatic startup via the Windows Registry.
+        /// </summary>
+        /// <param name="enable">If true, adds to startup; otherwise, removes it.</param>
         public static void SetStartup(bool enable)
         {
             const string runKey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -552,6 +681,7 @@ namespace MultiDisplayVCPServer
                             return;
                         }
 
+                        // Add quotes to handle spaces in the path
                         key.SetValue(appName, $"\"{executablePath}\"");
                         Log("Application added to Windows startup.");
                     }
