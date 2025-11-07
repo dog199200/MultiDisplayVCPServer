@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "Dfjg40/UWX4=",
+  "success": true,
+  "projectFilePath": "E:\\Projects\\MultiConnectionMonitorServer\\MultiConnectionMonitorServer\\MultiDisplayVCPServer.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\tamer\\.nuget\\packages\\system.codedom\\9.0.10\\system.codedom.9.0.10.nupkg.sha512",
+    "C:\\Users\\tamer\\.nuget\\packages\\system.management\\9.0.10\\system.management.9.0.10.nupkg.sha512"
+  ],
+  "logs": []
+}
