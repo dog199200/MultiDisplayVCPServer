@@ -5,12 +5,12 @@ using System.Text.Json;
 using System.Reflection;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
-using System;                 // Added
-using System.Collections.Generic; // Added
-using System.Windows.Forms;     // Added
-using System.Threading.Tasks;   // Added
-using System.Linq;            // Added
-using System.Net.Http;        // Added
+using System;
+using System.Collections.Generic;
+using System.Windows.Forms;
+using System.Threading.Tasks;
+using System.Linq;
+using System.Net.Http;
 
 namespace MultiDisplayVCPServer
 {
@@ -127,7 +127,7 @@ namespace MultiDisplayVCPServer
 
         /// <summary>
         /// Handles the form's Load event.
-        /// Loads all saved settings into the UI controls and starts the server.
+        /// Loads all saved settings, checks for updates, and then starts the server.
         /// </summary>
         private async void MainForm_Load(object sender, EventArgs e)
         {
@@ -153,6 +153,10 @@ namespace MultiDisplayVCPServer
 
             // Set the initial visibility of the form (hidden in tray or visible)
             SetFormInitialState();
+
+            // Check for updates silently on launch
+            // We use _= to run the task asynchronously without blocking the UI thread
+            _ = CheckForUpdatesAsync(silentCheck: true);
         }
 
         /// <summary>
@@ -472,7 +476,7 @@ namespace MultiDisplayVCPServer
 
         private async void checkUpdatesToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            await CheckForUpdatesAsync();
+            await CheckForUpdatesAsync(silentCheck: false);
         }
 
         /// <summary>
@@ -523,16 +527,18 @@ namespace MultiDisplayVCPServer
         /// <summary>
         /// Checks GitHub for a new version of the application.
         /// </summary>
-        private async Task CheckForUpdatesAsync()
+        /// <param name="silentCheck">If true, suppresses success/error messages (used during launch).</param>
+        private async Task CheckForUpdatesAsync(bool silentCheck)
         {
             // 1. Get current version
             Version currentVersion = Assembly.GetExecutingAssembly().GetName().Version;
 
-            // --- THIS IS THE FIX ---
-            Program.SetServerState(2); // Set state to "Busy"
-                                       // --- END FIX ---
-
-            MessageBox.Show("Checking for updates...", "Update Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (!silentCheck)
+            {
+                // Set server state to Busy (2) when running manually
+                Program.SetServerState(2);
+                MessageBox.Show("Checking for updates...", "Update Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
 
             try
             {
@@ -573,23 +579,27 @@ namespace MultiDisplayVCPServer
                         Process.Start(new ProcessStartInfo(downloadUrl) { UseShellExecute = true });
                     }
                 }
-                else
+                else if (!silentCheck) // Only show success message if run manually
                 {
                     MessageBox.Show("You are already running the latest version.", "Up to Date", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to check for updates. Please check your internet connection or visit the GitHub page manually.\n\nError: {ex.Message}",
+                if (!silentCheck) // Only show error message if run manually
+                {
+                    MessageBox.Show($"Failed to check for updates. Please check your internet connection or visit the GitHub page manually.\n\nError: {ex.Message}",
                                 "Update Check Failed",
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Error);
+                }
             }
             finally
             {
-                // --- THIS IS THE FIX ---
-                Program.SetServerState(1); // Set state back to "Running"
-                // --- END FIX ---
+                if (!silentCheck)
+                {
+                    Program.SetServerState(1); // Set state back to "Running"
+                }
             }
         }
 
