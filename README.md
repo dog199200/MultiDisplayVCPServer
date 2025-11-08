@@ -1,0 +1,3 @@
+This software program is designed to to work with the Macro Deck Multi-Display VCP extension. It serves as an end-to-end point of comminucation to get and control VCP codes for multiple displays on a computer. This cam be installed on multiple computers in a networkd, and a single instance of the Macreo Deck can send commands to then simultaneously.
+
+This will automatically pull any VCP from your display it can find. I am not responsible for any damage that may be caused by inputting invalid values into the VCP. Please consult your model manufacture to confirm valid codes.
