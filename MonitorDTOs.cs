@@ -19,7 +19,7 @@ namespace MultiDisplayVCPServer
         /// A list of all DDC/CI compliant monitors discovered by the server.
         /// </summary>
         [JsonPropertyName("monitors")]
-        public List<MonitorInfo> Monitors { get; set; } = new List<MonitorInfo>();
+        public List<MonitorInfo> Monitors { get; set; } = new();
     }
 
     /// <summary>
@@ -44,7 +44,7 @@ namespace MultiDisplayVCPServer
         /// A list of all VCP features (e.g., Brightness) discovered for this monitor.
         /// </summary>
         [JsonPropertyName("capabilities")]
-        public List<VcpFeature> Capabilities { get; set; } = new List<VcpFeature>();
+        public List<VcpFeature> Capabilities { get; set; } = new();
     }
 
     /// <summary>
@@ -94,6 +94,6 @@ namespace MultiDisplayVCPServer
         /// (e.g., [1, "HDMI 1"], [3, "DisplayPort"]).
         /// </summary>
         [JsonPropertyName("nonContinuousValues")]
-        public Dictionary<uint, string> NonContinuousValues { get; set; } = new Dictionary<uint, string>();
+        public Dictionary<uint, string> NonContinuousValues { get; set; } = new();
     }
 }

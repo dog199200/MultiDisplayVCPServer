@@ -114,13 +114,13 @@
     "E:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "restore": {
-      "projectUniqueName": "E:\\Projects\\MultiConnectionMonitorServer\\MultiConnectionMonitorServer\\MultiDisplayVCPServer.csproj",
+      "projectUniqueName": "E:\\Projects\\MultiDisplayVCPServer\\MultiDisplayVCPServer\\MultiDisplayVCPServer.csproj",
       "projectName": "MultiDisplayVCPServer",
-      "projectPath": "E:\\Projects\\MultiConnectionMonitorServer\\MultiConnectionMonitorServer\\MultiDisplayVCPServer.csproj",
+      "projectPath": "E:\\Projects\\MultiDisplayVCPServer\\MultiDisplayVCPServer\\MultiDisplayVCPServer.csproj",
       "packagesPath": "C:\\Users\\tamer\\.nuget\\packages\\",
-      "outputPath": "E:\\Projects\\MultiConnectionMonitorServer\\MultiConnectionMonitorServer\\obj\\",
+      "outputPath": "E:\\Projects\\MultiDisplayVCPServer\\MultiDisplayVCPServer\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "E:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -56,9 +56,10 @@ namespace MultiDisplayVCPServer
             // 
             notifyIcon1.ContextMenuStrip = contextMenuStrip1;
             notifyIcon1.Icon = (Icon)resources.GetObject("notifyIcon1.Icon");
-            notifyIcon1.Text = "DDC/CI Server";
+            notifyIcon1.Text = "Multi-Display VCP Server";
             notifyIcon1.Visible = true;
-            notifyIcon1.DoubleClick += notifyIcon1_DoubleClick;
+            // --- FIX: (IDE1006) Naming rule violation ---
+            notifyIcon1.DoubleClick += NotifyIcon1_DoubleClick;
             // 
             // contextMenuStrip1
             // 
@@ -71,14 +72,16 @@ namespace MultiDisplayVCPServer
             configureToolStripMenuItem.Name = "configureToolStripMenuItem";
             configureToolStripMenuItem.Size = new Size(203, 22);
             configureToolStripMenuItem.Text = "Configure";
-            configureToolStripMenuItem.Click += configureToolStripMenuItem_Click;
+            // --- FIX: (IDE1006) Naming rule violation ---
+            configureToolStripMenuItem.Click += ConfigureToolStripMenuItem_Click;
             // 
             // restartToolStripMenuItem
             // 
             restartToolStripMenuItem.Name = "restartToolStripMenuItem";
             restartToolStripMenuItem.Size = new Size(203, 22);
             restartToolStripMenuItem.Text = "Restart";
-            restartToolStripMenuItem.Click += restartToolStripMenuItem_Click;
+            // --- FIX: (IDE1006) Naming rule violation ---
+            restartToolStripMenuItem.Click += RestartToolStripMenuItem_Click;
             // 
             // runOnStartupToolStripMenuItem
             // 
@@ -86,7 +89,8 @@ namespace MultiDisplayVCPServer
             runOnStartupToolStripMenuItem.Name = "runOnStartupToolStripMenuItem";
             runOnStartupToolStripMenuItem.Size = new Size(203, 22);
             runOnStartupToolStripMenuItem.Text = "Run on Startup";
-            runOnStartupToolStripMenuItem.Click += runOnStartupToolStripMenuItem_Click;
+            // --- FIX: (IDE1006) Naming rule violation ---
+            runOnStartupToolStripMenuItem.Click += RunOnStartupToolStripMenuItem_Click;
             // 
             // minimizeToSystemTrayToolStripMenuItem
             // 
@@ -94,21 +98,24 @@ namespace MultiDisplayVCPServer
             minimizeToSystemTrayToolStripMenuItem.Name = "minimizeToSystemTrayToolStripMenuItem";
             minimizeToSystemTrayToolStripMenuItem.Size = new Size(203, 22);
             minimizeToSystemTrayToolStripMenuItem.Text = "Minimize to System Tray";
-            minimizeToSystemTrayToolStripMenuItem.Click += minimizeToSystemTrayToolStripMenuItem_Click;
+            // --- FIX: (IDE1006) Naming rule violation ---
+            minimizeToSystemTrayToolStripMenuItem.Click += MinimizeToSystemTrayToolStripMenuItem_Click;
             // 
             // checkUpdatesToolStripMenuItem
             // 
             checkUpdatesToolStripMenuItem.Name = "checkUpdatesToolStripMenuItem";
             checkUpdatesToolStripMenuItem.Size = new Size(203, 22);
             checkUpdatesToolStripMenuItem.Text = "Check for Updates";
-            checkUpdatesToolStripMenuItem.Click += checkUpdatesToolStripMenuItem_Click;
+            // --- FIX: (IDE1006) Naming rule violation ---
+            checkUpdatesToolStripMenuItem.Click += CheckUpdatesToolStripMenuItem_Click;
             // 
             // exitToolStripMenuItem
             // 
             exitToolStripMenuItem.Name = "exitToolStripMenuItem";
             exitToolStripMenuItem.Size = new Size(203, 22);
             exitToolStripMenuItem.Text = "Exit";
-            exitToolStripMenuItem.Click += exitToolStripMenuItem_Click;
+            // --- FIX: (IDE1006) Naming rule violation ---
+            exitToolStripMenuItem.Click += ExitToolStripMenuItem_Click;
             // 
             // portTextBox
             // 

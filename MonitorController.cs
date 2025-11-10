@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Diagnostics;
+using Microsoft.Win32;
 
 namespace MultiDisplayVCPServer
 {
@@ -95,6 +97,8 @@ namespace MultiDisplayVCPServer
 
         #region P/Invoke DllImports
 
+        // --- FIX: Reverted all to [DllImport] ---
+
         /// <summary>
         /// Enumerates display monitors (including virtual monitors that mirror part of the desktop).
         /// </summary>
@@ -166,7 +170,7 @@ namespace MultiDisplayVCPServer
         /// <summary>
         /// Retrieves the DDC/CI capabilities string from a monitor.
         /// </summary>
-        [DllImport("dxva2.dll", SetLastError = true)]
+        [DllImport("dxva2.dll", SetLastError = true, CharSet = CharSet.Ansi)] // Added CharSet.Ansi for StringBuilder
         public static extern bool CapabilitiesRequestAndCapabilitiesReply(
             IntPtr hMonitor,
             [Out] StringBuilder pszASCIICapabilitiesString,
@@ -182,28 +186,44 @@ namespace MultiDisplayVCPServer
         /// <returns>A list of PhysicalMonitorData objects, one for each valid monitor.</returns>
         public static List<PhysicalMonitorData> EnumeratePhysicalMonitors(Dictionary<string, string> pnpMap)
         {
-            List<PhysicalMonitorData> allMonitors = new List<PhysicalMonitorData>();
+            Debug.WriteLine("EnumeratePhysicalMonitors() started.");
+            List<PhysicalMonitorData> allMonitors = new();
 
+            Debug.WriteLine("Calling EnumDisplayMonitors...");
             EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
                 delegate (IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData)
                 {
+                    Debug.WriteLine($"EnumDisplayMonitors callback triggered for hMonitor: {hMonitor}");
                     uint physicalMonitorCount = 0;
                     if (GetNumberOfPhysicalMonitorsFromHMONITOR(hMonitor, ref physicalMonitorCount) && physicalMonitorCount > 0)
                     {
+                        Debug.WriteLine($"Found {physicalMonitorCount} physical monitor(s) for this hMonitor.");
                         PHYSICAL_MONITOR[] pMonitors = new PHYSICAL_MONITOR[physicalMonitorCount];
                         if (GetPhysicalMonitorsFromHMONITOR(hMonitor, physicalMonitorCount, pMonitors))
                         {
+                            Debug.WriteLine("Successfully retrieved physical monitor array.");
                             // Get the base device path (e.g., \\.\DISPLAY1)
+                            Debug.WriteLine("Getting device path from monitor handle...");
                             string devicePath = GetDevicePathFromMonitorHandle(hMonitor);
+                            Debug.WriteLine($"Device path: {devicePath}");
 
                             for (int i = 0; i < physicalMonitorCount; i++)
                             {
                                 var pMonitor = pMonitors[i];
                                 // Get the DDC/CI description name
                                 string description = new string(pMonitor.szPhysicalMonitorDescription).Trim('\0');
+                                Debug.WriteLine($"Processing physical monitor {i}: Handle={pMonitor.hPhysicalMonitor}, Description='{description}'");
 
                                 // Use the description to look up the stable PnP_ID from our WMI map
                                 pnpMap.TryGetValue(description, out string pnpId);
+                                if (string.IsNullOrEmpty(pnpId))
+                                {
+                                    Debug.WriteLine($"PnP_ID not found in WMI map for '{description}'.");
+                                }
+                                else
+                                {
+                                    Debug.WriteLine($"Found matching PnP_ID: {pnpId}");
+                                }
 
                                 allMonitors.Add(new PhysicalMonitorData
                                 {
@@ -214,12 +234,21 @@ namespace MultiDisplayVCPServer
                                 });
                             }
                         }
+                        else
+                        {
+                            Debug.WriteLine("GetPhysicalMonitorsFromHMONITOR failed.");
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine("GetNumberOfPhysicalMonitorsFromHMONITOR failed or returned 0.");
                     }
                     return true; // Continue enumeration
                 },
                 IntPtr.Zero
             );
-
+            Debug.WriteLine($"EnumDisplayMonitors finished. Found {allMonitors.Count} total physical monitors.");
+            Debug.WriteLine("EnumeratePhysicalMonitors() finished.");
             return allMonitors;
         }
 
@@ -228,15 +257,20 @@ namespace MultiDisplayVCPServer
         /// </summary>
         /// <param name="hMonitor">The monitor handle.</param>
         /// <returns>The device path string, or "Unknown Device" if it fails.</returns>
-        private static string GetDevicePathFromMonitorHandle(IntPtr hMonitor)
+private static string GetDevicePathFromMonitorHandle(IntPtr hMonitor)
         {
-            MONITORINFOEX info = new MONITORINFOEX();
+            Debug.WriteLine($"GetDevicePathFromMonitorHandle() started for hMonitor: {hMonitor}");
+            // --- FIX: (IDE0090) 'new' expression can be simplified ---
+            MONITORINFOEX info = new();
             info.cbSize = Marshal.SizeOf(typeof(MONITORINFOEX));
 
             if (GetMonitorInfo(hMonitor, ref info))
             {
-                return info.szDevice.Trim('\0');
+                string deviceName = info.szDevice.Trim('\0');
+                Debug.WriteLine($"GetMonitorInfo succeeded. Device path: {deviceName}");
+                return deviceName;
             }
+            Debug.WriteLine("GetMonitorInfo failed. Returning 'Unknown Device'.");
             return "Unknown Device";
         }
     }
