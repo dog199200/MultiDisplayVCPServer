@@ -165,8 +165,6 @@ namespace MultiDisplayVCPServer
             Log("Server restart sequence completed.");
         }
 
-
-
         /// <summary>
         /// The main server loop that runs on a background thread.
         /// </summary>
@@ -585,9 +583,20 @@ namespace MultiDisplayVCPServer
             {
                 if (monitor.Description.Equals(targetDescription, StringComparison.OrdinalIgnoreCase))
                 {
-                    foundHandle = monitor.Handle;
-                    Log($"Found handle {foundHandle} for {targetDescription}");
-                    break;
+                    // Test if this is the real monitor by checking for Input Select (0x60)
+                    uint current = 0, max = 0;
+                    MonitorController.MONITOR_CAPABILITIES_REQUEST_TYPE type = 0;
+
+                    if (MonitorController.GetVCPFeatureAndVCPFeatureReply(monitor.Handle, 0x60, ref type, ref current, ref max))
+                    {
+                        foundHandle = monitor.Handle;
+                        Log($"Found REAL handle {foundHandle} for {targetDescription}");
+                        break;
+                    }
+                    else
+                    {
+                        Log($"Found dummy/capture card handle for {targetDescription}. Ignoring.");
+                    }
                 }
             }
 
@@ -659,7 +668,16 @@ namespace MultiDisplayVCPServer
                 // 5. Discover all VCP features
                 Log($"Discovering VCP features for {pMon.Description}...");
                 List<VcpFeature> features = DiscoverAllVcpFeatures(hMonitor, sb.ToString());
-                Log($"Discovered {features.Count} features.");
+
+                // The Dummy Filter: If it has less than 10 features, it's a capture card.
+                if (features.Count < 10)
+                {
+                    Log($"Skipping {pMon.Description}: Only found {features.Count} features. Likely a capture card.");
+                    MonitorController.DestroyPhysicalMonitor(hMonitor);
+                    continue;
+                }
+
+                Log($"Discovered {features.Count} features. Adding to cache.");
 
                 monitorList.Add(new MonitorInfo
                 {
